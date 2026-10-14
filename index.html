@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>A-Frame Solar System (JSON-Driven)</title>
+  <!-- A-Frame Library -->
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <style>
+    /* UI Overlay Styling */
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+      user-select: none;
+      background-color: #020208;
+    }
+
+    #hud {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 1000;
+      color: #fff;
+      pointer-events: none;
+    }
+
+    h1 {
+      margin: 0 0 4px 0;
+      font-size: 1.4rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #ffd27d;
+      text-shadow: 0 0 10px rgba(255, 210, 125, 0.5);
+    }
+
+    p.subtitle {
+      margin: 0;
+      font-size: 0.8rem;
+      color: #8da0be;
+    }
+
+    /* Planet Navigation Bar */
+    #nav-bar {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      display: flex;
+      gap: 8px;
+      background: rgba(10, 15, 28, 0.85);
+      padding: 8px 12px;
+      border-radius: 40px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+      max-width: 95vw;
+      overflow-x: auto;
+    }
+
+    .nav-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #e0e6ed;
+      padding: 6px 14px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .nav-btn:hover {
+      background: rgba(255, 210, 125, 0.3);
+      border-color: #ffd27d;
+      color: #fff;
+      transform: translateY(-2px);
+    }
+
+    /* Planet Inspector Card */
+    #info-panel {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 290px;
+      background: rgba(10, 15, 28, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 14px;
+      padding: 16px;
+      color: #fff;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+      z-index: 1000;
+      transition: opacity 0.3s;
+    }
+
+    #info-panel h2 {
+      margin: 0 0 10px 0;
+      font-size: 1.25rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+      padding-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .gradient-preview {
+      width: 48px;
+      height: 12px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.4);
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      margin-bottom: 6px;
+      color: #b0c0d8;
+    }
+
+    .stat-row strong {
+      color: #fff;
+    }
+
+    .controls-hint {
+      position: absolute;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.75rem;
+      color: rgba(255, 255, 255, 0.45);
+      z-index: 999;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 2D HUD Overlays -->
+  <div id="hud">
+    <h1>Solar System Explorer</h1>
+    <p class="subtitle">Procedural WebXR JSON Model</p>
+  </div>
+
+  <div id="info-panel">
+    <h2 id="card-title">Sun <div id="card-swatch" class="gradient-preview"></div></h2>
+    <div class="stat-row"><span>Distance from Sun:</span> <strong id="card-dist">0 AU</strong></div>
+    <div class="stat-row"><span>Equatorial Radius:</span> <strong id="card-radius">696,340 km</strong></div>
+    <div class="stat-row"><span>Axial Tilt:</span> <strong id="card-tilt">7.25°</strong></div>
+    <div class="stat-row"><span>Orbital Period:</span> <strong id="card-orbit">N/A</strong></div>
+    <div class="stat-row"><span>Rotation Period:</span> <strong id="card-rot">27 days</strong></div>
+    <div class="stat-row"><span>Rings:</span> <strong id="card-rings">None</strong></div>
+    <div class="stat-row"><span>Known Moons:</span> <strong id="card-moons">None</strong></div>
+  </div>
+
+  <div class="controls-hint">Controls: Click & Drag to Look | WASD to Fly | Click Planet to Focus</div>
+
+  <div id="nav-bar">
+    <button class="nav-btn" onclick="focusBody('Overview')">🔭 Overview</button>
+    <button class="nav-btn" onclick="focusBody('Sun')">☀️ Sun</button>
+    <button class="nav-btn" onclick="focusBody('Mercury')">Mercury</button>
+    <button class="nav-btn" onclick="focusBody('Venus')">Venus</button>
+    <button class="nav-btn" onclick="focusBody('Earth')">Earth</button>
+    <button class="nav-btn" onclick="focusBody('Mars')">Mars</button>
+    <button class="nav-btn" onclick="focusBody('Jupiter')">Jupiter</button>
+    <button class="nav-btn" onclick="focusBody('Saturn')">Saturn</button>
+    <button class="nav-btn" onclick="focusBody('Uranus')">Uranus</button>
+    <button class="nav-btn" onclick="focusBody('Neptune')">Neptune</button>
+  </div>
+
+  <!-- A-Frame VR Scene -->
+  <a-scene background="color: #020208" renderer="antialias: true; colorManagement: true;">
+    <!-- Asset Store generated dynamically via JS -->
+    <a-assets id="assets-pool"></a-assets>
+
+    <!-- Starfield particles / backdrop -->
+    <a-sky radius="400" color="#03030c"></a-sky>
+    <a-entity id="starfield"></a-entity>
+
+    <!-- Central Lighting -->
+    <a-light type="point" intensity="2.8" distance="400" decay="0.5" color="#fff9e6" position="0 0 0"></a-light>
+    <a-light type="ambient" intensity="0.35" color="#3d4966"></a-light>
+
+    <!-- Camera Rig -->
+    <a-entity id="camera-rig" position="0 55 125" rotation="-28 0 0">
+      <a-camera id="main-cam" look-controls wasd-controls="fly: true; acceleration: 65">
+        <a-cursor color="#ffd27d" opacity="0.6" raycaster="objects: .clickable"></a-cursor>
+      </a-camera>
+    </a-entity>
+
+    <!-- Solar System Root Container -->
+    <a-entity id="solar-system"></a-entity>
+  </a-scene>
+
+  <script>
+    /* =========================================================================
+       1. DATA STRUCTURE (JSON)
+       Contains distances, radii, median hue gradients, axial tilts,
+       rings, moons, orbital revolutions, and axial rotation periods.
+       ========================================================================= */
+    const solarSystemData = {
+      sun: {
+        name: "Sun",
+        realDistance: "0 AU (Center)",
+        realRadius: "696,340 km",
+        realOrbit: "Center",
+        realRotation: "27.0 Days",
+        radius: 6.5,
+        rotationPeriod: 36000,
+        axialTilt: 7.25,
+        gradientHues: ["#ffffff", "#ffe259", "#ff9000", "#d12b00"],
+        rings: null,
+        moons: []
+      },
+      planets: [
+        {
+          name: "Mercury",
+          distance: 14,
+          radius: 0.55,
+          axialTilt: 0.03, // Nearly perpendicular
+          orbitPeriod: 8800,  // ms animation duration
+          rotationPeriod: 15000,
+          realDistance: "0.39 AU",
+          realRadius: "2,439.7 km",
+          realOrbit: "88 Days",
+          realRotation: "58.6 Days",
+          gradientHues: ["#3b3a39", "#787673", "#a8a6a2", "#5e5c5a"],
+          rings: null,
+          moons: []
+        },
+        {
+          name: "Venus",
+          distance: 21,
+          radius: 0.95,
+          axialTilt: 177.36, // Retrograde rotation
+          orbitPeriod: 14000,
+          rotationPeriod: 22000,
+          realDistance: "0.72 AU",
+          realRadius: "6,051.8 km",
+          realOrbit: "224.7 Days",
+          realRotation: "243.0 Days (Retrograde)",
+          gradientHues: ["#8f6a31", "#e3bb76", "#fadc96", "#c28e46"],
+          rings: null,
+          moons: []
+        },
+        {
+          name: "Earth",
+          distance: 29,
+          radius: 1.0,
+          axialTilt: 23.44,
+          orbitPeriod: 20000,
+          rotationPeriod: 5000,
+          realDistance: "1.00 AU",
+          realRadius: "6,371.0 km",
+          realOrbit: "365.25 Days",
+          realRotation: "23h 56m",
+          gradientHues: ["#143a56", "#256394", "#438a5e", "#f0ede6", "#1a4066"],
+          rings: null,
+          moons: [
+            { name: "Moon", radius: 0.27, distance: 2.2, orbitPeriod: 4500, color: "#cccccc" }
+          ]
+        },
+        {
+          name: "Mars",
+          distance: 38,
+          radius: 0.68,
+          axialTilt: 25.19,
+          orbitPeriod: 26000,
+          rotationPeriod: 5200,
+          realDistance: "1.52 AU",
+          realRadius: "3,389.5 km",
+          realOrbit: "687 Days",
+          realRotation: "24h 37m",
+          gradientHues: ["#5e1b09", "#9c3714", "#d4622a", "#f0945d", "#7a270d"],
+          rings: null,
+          moons: [
+            { name: "Phobos", radius: 0.1, distance: 1.4, orbitPeriod: 2200, color: "#8a8279" },
+            { name: "Deimos", radius: 0.08, distance: 1.9, orbitPeriod: 3800, color: "#a59d94" }
+          ]
+        },
+        {
+          name: "Jupiter",
+          distance: 52,
+          radius: 2.8,
+          axialTilt: 3.13,
+          orbitPeriod: 48000,
+          rotationPeriod: 2800,
+          realDistance: "5.20 AU",
+          realRadius: "69,911 km",
+          realOrbit: "11.86 Years",
+          realRotation: "9h 55m",
+          gradientHues: ["#4a2711", "#a1683d", "#d9b38c", "#824c25", "#f2dfce", "#4a2711"],
+          rings: null,
+          moons: [
+            { name: "Io", radius: 0.25, distance: 4.0, orbitPeriod: 2800, color: "#e3c83b" },
+            { name: "Europa", radius: 0.22, distance: 4.8, orbitPeriod: 3900, color: "#c2b49b" },
+            { name: "Ganymede", radius: 0.35, distance: 5.8, orbitPeriod: 5800, color: "#8a7e75" },
+            { name: "Callisto", radius: 0.31, distance: 7.0, orbitPeriod: 8000, color: "#595048" }
+          ]
+        },
+        {
+          name: "Saturn",
+          distance: 70,
+          radius: 2.4,
+          axialTilt: 26.73,
+          orbitPeriod: 70000,
+          rotationPeriod: 3100,
+          realDistance: "9.58 AU",
+          realRadius: "58,232 km",
+          realOrbit: "29.45 Years",
+          realRotation: "10h 33m",
+          gradientHues: ["#635332", "#bda066", "#fae6b1", "#9e844f", "#e6cb91"],
+          rings: {
+            innerRadius: 3.1,
+            outerRadius: 6.0,
+            gradientHues: ["rgba(150, 120, 75, 0.2)", "rgba(230, 205, 150, 0.8)", "rgba(100, 80, 50, 0.2)", "rgba(200, 175, 125, 0.9)", "rgba(80, 60, 40, 0.0)"]
+          },
+          moons: [
+            { name: "Titan", radius: 0.36, distance: 7.5, orbitPeriod: 6200, color: "#e39c36" },
+            { name: "Rhea", radius: 0.18, distance: 9.0, orbitPeriod: 8800, color: "#b5b0a5" }
+          ]
+        },
+        {
+          name: "Uranus",
+          distance: 86,
+          radius: 1.6,
+          axialTilt: 97.77, // Rotates on its side
+          orbitPeriod: 95000,
+          rotationPeriod: 4000,
+          realDistance: "19.22 AU",
+          realRadius: "25,362 km",
+          realOrbit: "84.02 Years",
+          realRotation: "17h 14m (Retrograde roll)",
+          gradientHues: ["#2d6570", "#4aa6b5", "#92e1eb", "#63bfcc", "#34727d"],
+          rings: {
+            innerRadius: 2.1,
+            outerRadius: 3.2,
+            gradientHues: ["rgba(130, 190, 210, 0.1)", "rgba(175, 230, 245, 0.5)", "rgba(90, 140, 160, 0.05)"]
+          },
+          moons: [
+            { name: "Titania", radius: 0.22, distance: 4.0, orbitPeriod: 5200, color: "#c4cbcc" },
+            { name: "Oberon", radius: 0.2, distance: 4.9, orbitPeriod: 7200, color: "#9ea3a3" }
+          ]
+        },
+        {
+          name: "Neptune",
+          distance: 102,
+          radius: 1.5,
+          axialTilt: 28.32,
+          orbitPeriod: 130000,
+          rotationPeriod: 4200,
+          realDistance: "30.05 AU",
+          realRadius: "24,622 km",
+          realOrbit: "164.8 Years",
+          realRotation: "16h 06m",
+          gradientHues: ["#162a61", "#2b4fa3", "#457fe6", "#6ea5ff", "#1c357a"],
+          rings: null,
+          moons: [
+            { name: "Triton", radius: 0.24, distance: 3.4, orbitPeriod: 4600, color: "#cad6de" }
+          ]
+        }
+      ]
+    };
+
+    /* =========================================================================
+       2. PROCEDURAL TEXTURE GENERATOR (Median Hues as Gradients)
+       ========================================================================= */
+    function createGradientTexture(hues, isBanded = false) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 256;
+      const ctx = canvas.getContext("2d");
+
+      // Vertical linear gradient representing planetary latitudes
+      const gradient = ctx.createLinearGradient(0, 0, 0, 256);
+      hues.forEach((color, idx) => {
+        gradient.addColorStop(idx / (hues.length - 1), color);
+      });
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 512, 256);
+
+      // Add atmospheric banding & noise striations
+      if (isBanded) {
+        for (let y = 0; y < 256; y += 2) {
+          const noise = Math.sin(y * 0.2) * 0.06;
+          ctx.fillStyle = y % 4 === 0 
+            ? `rgba(255, 255, 255, ${Math.abs(noise)})` 
+            : `rgba(0, 0, 0, ${Math.abs(noise)})`;
+          ctx.fillRect(0, y, 512, 2);
+        }
+      }
+      return canvas.toDataURL("image/png");
+    }
+
+    function createRingTexture(gradientHues) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+      const ctx = canvas.getContext("2d");
+      const cx = 256, cy = 256;
+
+      const radialGrad = ctx.createRadialGradient(cx, cy, 80, cx, cy, 256);
+      gradientHues.forEach((color, idx) => {
+        radialGrad.addColorStop(idx / (gradientHues.length - 1), color);
+      });
+
+      ctx.fillStyle = radialGrad;
+      ctx.fillRect(0, 0, 512, 512);
+
+      // Clear center hole for donut effect
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 80, 0, Math.PI * 2);
+      ctx.fill();
+
+      return canvas.toDataURL("image/png");
+    }
+
+    /* =========================================================================
+       3. BUILD 3D SOLAR SYSTEM FROM JSON
+       ========================================================================= */
+    const assetsPool = document.getElementById("assets-pool");
+    const sceneRoot = document.getElementById("solar-system");
+    const starfield = document.getElementById("starfield");
+
+    // Scatter 800 random stars in outer sphere
+    for (let i = 0; i < 800; i++) {
+      const star = document.createElement("a-sphere");
+      const radius = 320 + Math.random() * 50;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos((Math.random() * 2) - 1);
+      const x = radius * Math.sin(phi) * Math.cos(theta);
+      const y = radius * Math.sin(phi) * Math.sin(theta);
+      const z = radius * Math.cos(phi);
+      star.setAttribute("position", `${x} ${y} ${z}`);
+      star.setAttribute("radius", Math.random() * 0.45 + 0.15);
+      star.setAttribute("material", "shader: flat; color: #ffffff; opacity: " + (Math.random() * 0.8 + 0.2));
+      starfield.appendChild(star);
+    }
+
+    // Register Sun Asset & Entity
+    const sunTexData = createGradientTexture(solarSystemData.sun.gradientHues, true);
+    const sunImg = document.createElement("img");
+    sunImg.id = "tex-sun";
+    sunImg.src = sunTexData;
+    assetsPool.appendChild(sunImg);
+
+    // Sun Entity Group
+    const sunGroup = document.createElement("a-entity");
+    sunGroup.id = "body-Sun";
+    sunGroup.setAttribute("class", "clickable");
+    sunGroup.setAttribute("data-name", "Sun");
+
+    // Sun Sphere Mesh
+    const sunSphere = document.createElement("a-sphere");
+    sunSphere.setAttribute("radius", solarSystemData.sun.radius);
+    sunSphere.setAttribute("material", `src: #tex-sun; shader: flat; emissive: #ffaa00; emissiveIntensity: 0.9;`);
+    sunSphere.setAttribute("rotation", `0 0 ${solarSystemData.sun.axialTilt}`);
+    sunSphere.setAttribute("animation", `property: rotation; to: 0 360 ${solarSystemData.sun.axialTilt}; loop: true; dur: ${solarSystemData.sun.rotationPeriod}; easing: linear`);
+    
+    // Sun Outer Corona Atmosphere
+    const sunCorona = document.createElement("a-sphere");
+    sunCorona.setAttribute("radius", solarSystemData.sun.radius * 1.14);
+    sunCorona.setAttribute("material", "color: #ffaa33; transparent: true; opacity: 0.22; shader: flat; side: back;");
+    sunGroup.appendChild(sunCorona);
+    sunGroup.appendChild(sunSphere);
+    sceneRoot.appendChild(sunGroup);
+
+    // Build Planets & Moons dynamically
+    solarSystemData.planets.forEach(p => {
+      // 1. Generate & Cache Planet Texture
+      const texData = createGradientTexture(p.gradientHues, true);
+      const img = document.createElement("img");
+      img.id = `tex-${p.name}`;
+      img.src = texData;
+      assetsPool.appendChild(img);
+
+      // 2. Orbit Path Visualizer Ring (XZ plane)
+      const orbitRing = document.createElement("a-ring");
+      orbitRing.setAttribute("radius-inner", p.distance - 0.08);
+      orbitRing.setAttribute("radius-outer", p.distance + 0.08);
+      orbitRing.setAttribute("rotation", "-90 0 0");
+      orbitRing.setAttribute("material", "color: #5d718a; opacity: 0.22; transparent: true; side: double;");
+      sceneRoot.appendChild(orbitRing);
+
+      // 3. Orbit Anchor (revolves around Sun center)
+      const orbitAnchor = document.createElement("a-entity");
+      orbitAnchor.id = `orbit-${p.name}`;
+      orbitAnchor.setAttribute("animation", `property: rotation; to: 0 360 0; loop: true; dur: ${p.orbitPeriod}; easing: linear`);
+
+      // 4. Position Node at Planet's Distance
+      // Counter-rotates so planetary axial tilt maintains fixed orientation in space
+      const posNode = document.createElement("a-entity");
+		      console.log("setup name", p.name);
+      posNode.id = `pos-${p.name}`;
+      posNode.setAttribute("position", `${p.distance} 0 0`);
+      posNode.setAttribute("animation", `property: rotation; to: 0 -360 0; loop: true; dur: ${p.orbitPeriod}; easing: linear`);
+
+      // 5. Axial Tilt Wrapper
+      const tiltNode = document.createElement("a-entity");
+      tiltNode.setAttribute("rotation", `0 0 ${p.axialTilt}`);
+
+      // 6. Planet Mesh (rotates along polar axis)
+      const bodySphere = document.createElement("a-sphere");
+      bodySphere.id = `body-${p.name}`;
+      bodySphere.setAttribute("class", "clickable");
+      bodySphere.setAttribute("data-name", p.name);
+      bodySphere.setAttribute("radius", p.radius);
+      bodySphere.setAttribute("material", `src: #tex-${p.name}; roughness: 0.8; metalness: 0.1;`);
+      bodySphere.setAttribute("animation", `property: rotation; to: 0 360 0; loop: true; dur: ${p.rotationPeriod}; easing: linear`);
+      tiltNode.appendChild(bodySphere);
+
+      // 7. Rings (if any, aligned with equator inside tilt node)
+      if (p.rings) {
+        const ringTexData = createRingTexture(p.rings.gradientHues);
+        const ringImg = document.createElement("img");
+        ringImg.id = `ringtex-${p.name}`;
+        ringImg.src = ringTexData;
+        assetsPool.appendChild(ringImg);
+
+        const ringEntity = document.createElement("a-ring");
+        ringEntity.setAttribute("radius-inner", p.rings.innerRadius);
+        ringEntity.setAttribute("radius-outer", p.rings.outerRadius);
+        ringEntity.setAttribute("rotation", "-90 0 0");
+        ringEntity.setAttribute("material", `src: #ringtex-${p.name}; transparent: true; side: double; roughness: 0.5;`);
+        tiltNode.appendChild(ringEntity);
+      }
+
+      // 8. Moons
+      if (p.moons && p.moons.length > 0) {
+        p.moons.forEach(m => {
+          // Moon orbit revolving around planet
+          const moonOrbit = document.createElement("a-entity");
+          moonOrbit.setAttribute("animation", `property: rotation; to: 0 360 0; loop: true; dur: ${m.orbitPeriod}; easing: linear`);
+
+          const moonSphere = document.createElement("a-sphere");
+          moonSphere.setAttribute("position", `${m.distance} 0 0`);
+          moonSphere.setAttribute("radius", m.radius);
+          moonSphere.setAttribute("material", `color: ${m.color}; roughness: 0.9;`);
+
+          moonOrbit.appendChild(moonSphere);
+          posNode.appendChild(moonOrbit);
+        });
+      }
+
+      posNode.appendChild(tiltNode);
+      orbitAnchor.appendChild(posNode);
+      sceneRoot.appendChild(orbitAnchor);
+    });
+
+    /* =========================================================================
+       4. INTERACTION & CAMERA MANAGEMENT
+       ========================================================================= */
+    const cardTitle = document.getElementById("card-title");
+    const cardSwatch = document.getElementById("card-swatch");
+    const cardDist = document.getElementById("card-dist");
+    const cardRadius = document.getElementById("card-radius");
+    const cardTilt = document.getElementById("card-tilt");
+    const cardOrbit = document.getElementById("card-orbit");
+    const cardRot = document.getElementById("card-rot");
+    const cardRings = document.getElementById("card-rings");
+    const cardMoons = document.getElementById("card-moons");
+    const cameraRig = document.getElementById("camera-rig");
+
+    function displayInfo(data) {
+      cardTitle.innerHTML = `${data.name} <div id="card-swatch" class="gradient-preview"></div>`;
+      const swatch = document.getElementById("card-swatch");
+      swatch.style.background = `linear-gradient(to right, ${data.gradientHues.join(", ")})`;
+      cardDist.innerText = data.realDistance;
+      cardRadius.innerText = data.realRadius;
+      cardTilt.innerText = `${data.axialTilt}°`;
+      cardOrbit.innerText = data.realOrbit;
+      cardRot.innerText = data.realRotation;
+      cardRings.innerText = data.rings ? "Yes (Active)" : "None";
+      cardMoons.innerText = data.moons && data.moons.length > 0 
+        ? data.moons.map(m => m.name).join(", ") 
+        : "None";
+    }
+
+    // Set initial card info to Sun
+    displayInfo(solarSystemData.sun);
+    
+    AFRAME.registerComponent('camera-tracker', {
+	  schema: {
+	    target: { type: 'selector' },
+	    offsetY: { type: 'number', default: 2 },
+	    offsetZ: { type: 'number', default: 6 },
+	    active: { type: 'boolean', default: false }
+	  },
+	  init: function () {
+	    this.tempVec = new THREE.Vector3();
+	  },
+	  tick: function () {
+	    if (!this.data.active || !this.data.target) return;
+
+	    // Force target world matrix update to get current frame position
+	    this.data.target.object3D.updateWorldMatrix(true, false);
+
+	    // Compute offset relative to the planet's coordinate frame
+	    this.tempVec.set(0, this.data.offsetY, this.data.offsetZ);
+	    this.data.target.object3D.localToWorld(this.tempVec);
+
+	    // Lock camera rig to the planet's world coordinates
+	    this.el.object3D.position.copy(this.tempVec);
+	  }
+	});
+
+    // Target Camera Tracking / Teleportation
+	window.focusBody = function(name) {
+	  // Clear any active transitions
+	  cameraRig.removeAttribute("animation__pos");
+	  cameraRig.removeAttribute("animation__rot");
+
+	  if (name === "Overview") {
+	    // Stop tracking and smoothly return to overview
+	    cameraRig.setAttribute("camera-tracker", "active", false);
+	    cameraRig.setAttribute("animation__pos", "property: position; to: 0 55 125; dur: 1400; easing: easeInOutCubic");
+	    cameraRig.setAttribute("animation__rot", "property: rotation; to: -28 0 0; dur: 1400; easing: easeInOutCubic");
+	    return;
+	  }
+
+	  if (name === "Sun") {
+	    // Stop tracking and focus on Sun at the origin
+	    cameraRig.setAttribute("camera-tracker", "active", false);
+	    cameraRig.setAttribute("animation__pos", "property: position; to: 0 3 18; dur: 1200; easing: easeInOutCubic");
+	    cameraRig.setAttribute("animation__rot", "property: rotation; to: 0 0 0; dur: 1200; easing: easeInOutCubic");
+	    displayInfo(solarSystemData.sun);
+	    return;
+	  }
+
+	  const targetData = solarSystemData.planets.find(p => p.name === name);
+	  const targetPosNode = document.getElementById(`pos-${name}`);
+
+	  if (targetData && targetPosNode) {
+	    const camZ = (targetData.radius * 3.2) + 2.0;
+	    const camY = targetData.radius * 1.0 + 0.6;
+
+	    // Point the camera down slightly toward the planet
+	    cameraRig.setAttribute("rotation", "-10 0 0");
+
+	    // Activate frame-by-frame tracking without touching DOM hierarchy
+	    cameraRig.setAttribute("camera-tracker", {
+	      active: true,
+	      target: `#pos-${name}`,
+	      offsetY: camY,
+	      offsetZ: camZ
+	    });
+
+	    displayInfo(targetData);
+	  }
+	};
+
+    // Click handler for 3D spheres
+    document.addEventListener("DOMContentLoaded", () => {
+      sceneRoot.addEventListener("click", (evt) => {
+        const bodyName = evt.detail.intersectedEl?.getAttribute("data-name");
+        if (bodyName) {
+          focusBody(bodyName);
+        }
+      });
+    });
+  </script>
+</body>
+</html>
